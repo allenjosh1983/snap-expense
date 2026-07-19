@@ -15,6 +15,8 @@ export default function HomePage() {
   const [parsed, setParsed] = useState<ParsedReceipt | null>(null);
   const [imageBase64, setImageBase64] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
+  const [savedTabName, setSavedTabName] = useState("Receipts");
 
   async function handleCapture(
     _file: File,
@@ -63,6 +65,12 @@ export default function HomePage() {
       }
 
       setSuccessMessage(data.message || "Receipt saved");
+      setSpreadsheetUrl(
+        typeof data.spreadsheetUrl === "string" ? data.spreadsheetUrl : null,
+      );
+      setSavedTabName(
+        typeof data.tabName === "string" ? data.tabName : "Receipts",
+      );
       setStep("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -77,6 +85,8 @@ export default function HomePage() {
     setImageBase64("");
     setError(null);
     setSuccessMessage("");
+    setSpreadsheetUrl(null);
+    setSavedTabName("Receipts");
   }
 
   return (
@@ -127,9 +137,20 @@ export default function HomePage() {
             {successMessage}
           </h2>
           <p className="text-sm text-emerald-800">
-            Your receipt is in Google Sheets and ready for bookkeeping or your
-            accountant.
+            Open the{" "}
+            <span className="font-semibold">{savedTabName}</span> tab (not
+            Sheet1) to see your expense row.
           </p>
+          {spreadsheetUrl && (
+            <a
+              href={spreadsheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block rounded-2xl border border-emerald-300 bg-white px-6 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
+            >
+              Open Google Sheet
+            </a>
+          )}
           <button
             type="button"
             onClick={resetFlow}

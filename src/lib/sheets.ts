@@ -1,8 +1,9 @@
 import { Readable } from "stream";
 import { google } from "googleapis";
+import { getGoogleAuth } from "./google-auth";
 import type { ReceiptSubmission } from "./types";
 
-const HEADERS = [
+const RECEIPT_HEADERS = [
   "Submitted At",
   "Date",
   "Merchant",
@@ -13,28 +14,27 @@ const HEADERS = [
   "Deductible",
   "Notes",
   "Image URL",
+];
+
+const OCR_ARCHIVE_TAB = "OCR Archive";
+
+const OCR_ARCHIVE_HEADERS = [
+  "Submitted At",
+  "Merchant",
+  "Date",
   "Raw OCR Text",
 ];
 
-function getAuth() {
-  const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (!credentialsPath) {
-    throw new Error("GOOGLE_APPLICATION_CREDENTIALS is not set");
-  }
-
-  return new google.auth.GoogleAuth({
-    keyFile: credentialsPath,
-    scopes: [
-      "https://www.googleapis.com/auth/spreadsheets",
-      "https://www.googleapis.com/auth/drive.file",
-    ],
-  });
-}
+const SHEETS_SCOPES = [
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/drive.file",
+];
 
 async function ensureSheetTab(
   sheets: ReturnType<typeof google.sheets>,
   spreadsheetId: string,
   tabName: string,
+  headers: string[],
 ): Promise<void> {
   const meta = await sheets.spreadsheets.get({ spreadsheetId });
   const existing = meta.data.sheets?.find(
@@ -61,7 +61,7 @@ async function ensureSheetTab(
     range: `${tabName}!A1`,
     valueInputOption: "RAW",
     requestBody: {
-      values: [HEADERS],
+      values: [headers],
     },
   });
 }
@@ -74,7 +74,11 @@ async function uploadReceiptImage(
 ): Promise<string | undefined> {
   if (!imageBase64) return undefined;
 
-  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID?.trim();
+  if (!folderId) {
+    return undefined;
+  }
+
   const fileName = `receipt-${date || "unknown"}-${merchant || "expense"}.jpg`.replace(
     /[^\w.\-]+/g,
     "-",
@@ -84,7 +88,7 @@ async function uploadReceiptImage(
     requestBody: {
       name: fileName,
       mimeType: "image/jpeg",
-      ...(folderId ? { parents: [folderId] } : {}),
+      parents: [folderId],
     },
     media: {
       mimeType: "image/jpeg",
@@ -106,18 +110,33 @@ export async function appendReceiptToSheet(
     throw new Error("GOOGLE_SHEETS_ID is not set");
   }
 
-  const auth = getAuth();
+  const auth = getGoogleAuth(SHEETS_SCOPES);
   const sheets = google.sheets({ version: "v4", auth });
-  const drive = google.drive({ version: "v3", auth });
 
-  await ensureSheetTab(sheets, spreadsheetId, tabName);
+  await ensureSheetTab(sheets, spreadsheetId, tabName, RECEIPT_HEADERS);
 
-  const imageUrl = await uploadReceiptImage(
-    drive,
-    receipt.imageBase64,
-    receipt.merchant,
-    receipt.date,
-  );
+  let imageUrl: string | undefined;
+  const shouldUploadImage =
+    Boolean(receipt.imageBase64) &&
+    Boolean(process.env.GOOGLE_DRIVE_FOLDER_ID?.trim());
+
+  if (shouldUploadImage) {
+    const drive = google.drive({ version: "v3", auth });
+    try {
+      imageUrl = await uploadReceiptImage(
+        drive,
+        receipt.imageBase64,
+        receipt.merchant,
+        receipt.date,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown Drive upload error";
+      console.warn(
+        `[sheets] Receipt image upload skipped (${message}); saving row without Image URL`,
+      );
+    }
+  }
 
   const submittedAt = new Date().toISOString();
   const row = [
@@ -131,18 +150,37 @@ export async function appendReceiptToSheet(
     receipt.deductible ? "Yes" : "No",
     receipt.notes ?? "",
     imageUrl ?? "",
-    receipt.rawText ?? "",
   ];
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${tabName}!A:K`,
+    range: `${tabName}!A:J`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: {
       values: [row],
     },
   });
+
+  const rawText = receipt.rawText?.trim();
+  if (rawText) {
+    await ensureSheetTab(
+      sheets,
+      spreadsheetId,
+      OCR_ARCHIVE_TAB,
+      OCR_ARCHIVE_HEADERS,
+    );
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${OCR_ARCHIVE_TAB}!A:D`,
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: {
+        values: [[submittedAt, receipt.merchant, receipt.date, rawText]],
+      },
+    });
+  }
 
   return { imageUrl };
 }

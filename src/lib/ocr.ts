@@ -1,12 +1,17 @@
 import { ImageAnnotatorClient } from "@google-cloud/vision";
 import type { ParsedReceipt } from "./types";
+import { getGoogleAuth } from "./google-auth";
 import { parseReceiptText } from "./parse-receipt";
+
+const VISION_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"];
 
 let visionClient: ImageAnnotatorClient | null = null;
 
 function getVisionClient(): ImageAnnotatorClient {
   if (!visionClient) {
-    visionClient = new ImageAnnotatorClient();
+    visionClient = new ImageAnnotatorClient({
+      auth: getGoogleAuth(VISION_SCOPES),
+    });
   }
   return visionClient;
 }

@@ -59,9 +59,17 @@ export async function POST(request: NextRequest) {
       }
 
       const result = await appendReceiptToSheet(receipt);
+      const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
+      const tabName = process.env.GOOGLE_SHEETS_TAB || "Receipts";
+      const spreadsheetUrl = spreadsheetId
+        ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
+        : undefined;
+
       return NextResponse.json({
         ok: true,
-        message: "Receipt saved to Google Sheets",
+        message: `Receipt saved to the "${tabName}" tab`,
+        tabName,
+        spreadsheetUrl,
         imageUrl: result.imageUrl,
       });
     }
