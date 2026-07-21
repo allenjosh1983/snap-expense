@@ -22,8 +22,11 @@ export async function extractReceiptFromImage(
   const client = getVisionClient();
   const buffer = Buffer.from(imageBase64, "base64");
 
-  const [result] = await client.textDetection({
+  const [result] = await client.documentTextDetection({
     image: { content: buffer },
+    imageContext: {
+      languageHints: ["en"],
+    },
   });
 
   const rawText =

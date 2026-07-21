@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Snap Expense",
-  description: "Snap receipt photos and send them to your LLC expense spreadsheet",
+  description: "Expense tracking on the go — snap receipt photos and send them to your spreadsheet",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#059669",
+  themeColor: "#0f766e",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

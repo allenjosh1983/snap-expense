@@ -12,6 +12,7 @@ interface ReceiptFormProps {
   initial: ParsedReceipt;
   imageBase64: string;
   onSubmit: (receipt: ReceiptSubmission) => Promise<void>;
+  onRetakePhoto: () => void;
   loading?: boolean;
 }
 
@@ -87,10 +88,17 @@ function needsDateReview(initial: ParsedReceipt): boolean {
   return parseOcrDateToIso(initial.date) === null;
 }
 
+function confidenceClass(confidence: ParsedReceipt["confidence"]): string {
+  if (confidence === "high") return "confidence-badge confidence-high";
+  if (confidence === "medium") return "confidence-badge confidence-medium";
+  return "confidence-badge confidence-low";
+}
+
 export function ReceiptForm({
   initial,
   imageBase64,
   onSubmit,
+  onRetakePhoto,
   loading,
 }: ReceiptFormProps) {
   const initialIso = parseOcrDateToIso(initial.date);
@@ -172,145 +180,239 @@ export function ReceiptForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-900">Review receipt</h2>
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-medium ${
-            initial.confidence === "high"
-              ? "bg-emerald-100 text-emerald-700"
-              : initial.confidence === "medium"
-                ? "bg-amber-100 text-amber-700"
-                : "bg-rose-100 text-rose-700"
-          }`}
-        >
-          OCR {initial.confidence} confidence
-        </span>
-      </div>
-
-      <p className="text-sm text-slate-600">
-        Confirm the details before saving to your spreadsheet. Edit anything the
-        scanner missed.
-      </p>
-
-      <Field label="Merchant">
-        <input
-          value={merchant}
-          onChange={(e) => setMerchant(e.target.value)}
-          className="field-input"
-          required
-        />
-      </Field>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Date">
-          {showDateHint && (
-            <p className="text-xs text-amber-700">
-              Check the date — OCR may have misread it
+    <form onSubmit={handleSubmit} className="pb-24">
+      <div className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Review receipt
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Confirm details before saving to your expense sheet.
             </p>
-          )}
-          <div className="relative">
-            <input
-              value={date}
-              onChange={handleDateDisplayChange}
-              placeholder="MM/DD/YYYY"
-              className="field-input pr-11"
-              inputMode="numeric"
-              required
-            />
+          </div>
+          <span className={confidenceClass(initial.confidence)}>
+            OCR {initial.confidence}
+          </span>
+        </div>
+
+        {imageBase64 && (
+          <section className="space-y-3" aria-label="Receipt photo">
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`data:image/jpeg;base64,${imageBase64}`}
+                alt="Captured receipt"
+                className="max-h-48 w-full object-contain"
+              />
+            </div>
             <button
               type="button"
-              onClick={openDatePicker}
-              aria-label="Open calendar"
-              className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+              onClick={onRetakePhoto}
+              disabled={loading}
+              className="btn-secondary min-h-11"
             >
-              <CalendarIcon />
+              <RetakeIcon />
+              Retake photo
             </button>
+          </section>
+        )}
+
+        <section className="form-section">
+          <h3 className="form-section-title">Receipt details</h3>
+
+          <Field label="Merchant / vendor">
             <input
-              ref={datePickerRef}
-              type="date"
-              value={dateIso}
-              onChange={handleDatePickerChange}
-              tabIndex={-1}
-              aria-hidden
-              className="pointer-events-none absolute h-0 w-0 opacity-0"
+              value={merchant}
+              onChange={(e) => setMerchant(e.target.value)}
+              className="field-input"
+              placeholder="Store or business name"
+              required
             />
+          </Field>
+
+          <Field label="Transaction date">
+            {showDateHint && (
+              <p className="text-xs font-medium text-amber-700">
+                Verify the date — OCR may have misread it
+              </p>
+            )}
+            <div className="relative">
+              <input
+                value={date}
+                onChange={handleDateDisplayChange}
+                placeholder="MM/DD/YYYY"
+                className="field-input pr-12"
+                inputMode="numeric"
+                required
+              />
+              <button
+                type="button"
+                onClick={openDatePicker}
+                aria-label="Open calendar"
+                className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-teal-700"
+              >
+                <CalendarIcon />
+              </button>
+              <input
+                ref={datePickerRef}
+                type="date"
+                value={dateIso}
+                onChange={handleDatePickerChange}
+                tabIndex={-1}
+                aria-hidden
+                className="pointer-events-none absolute h-0 w-0 opacity-0"
+              />
+            </div>
+          </Field>
+        </section>
+
+        <section className="form-section">
+          <h3 className="form-section-title">Tax &amp; amounts</h3>
+
+          <Field label="Total amount">
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                $
+              </span>
+              <input
+                value={total}
+                onChange={(e) => setTotal(e.target.value)}
+                inputMode="decimal"
+                className="field-input pl-7"
+                placeholder="0.00"
+                required
+              />
+            </div>
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Subtotal">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                  $
+                </span>
+                <input
+                  value={subtotal}
+                  onChange={(e) => setSubtotal(e.target.value)}
+                  inputMode="decimal"
+                  className="field-input pl-7"
+                  placeholder="0.00"
+                />
+              </div>
+            </Field>
+            <Field label="Sales tax">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                  $
+                </span>
+                <input
+                  value={tax}
+                  onChange={(e) => setTax(e.target.value)}
+                  inputMode="decimal"
+                  className="field-input pl-7"
+                  placeholder="0.00"
+                />
+              </div>
+            </Field>
           </div>
-        </Field>
-        <Field label="Total">
-          <input
-            value={total}
-            onChange={(e) => setTotal(e.target.value)}
-            inputMode="decimal"
-            className="field-input"
-            required
-          />
-        </Field>
+        </section>
+
+        <section className="form-section">
+          <h3 className="form-section-title">Classification</h3>
+
+          <Field label="Expense category">
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
+              className="field-select"
+            >
+              {EXPENSE_CATEGORIES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Notes (optional)">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              className="field-input min-h-[4.5rem] resize-none"
+              placeholder="Business purpose, client meeting, project code…"
+            />
+          </Field>
+
+          <div
+            className={`rounded-lg border p-4 transition ${
+              deductible
+                ? "border-teal-200 bg-teal-50/60"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={deductible}
+                onChange={(e) => setDeductible(e.target.checked)}
+                className="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-300 text-teal-700 focus:ring-teal-600"
+              />
+              <span className="space-y-0.5">
+                <span className="block text-sm font-medium text-slate-900">
+                  Tax-deductible business expense
+                </span>
+                <span className="block text-xs leading-relaxed text-slate-600">
+                  Check for ordinary LLC operating expenses you can write off.
+                  Uncheck for personal or non-deductible purchases.
+                </span>
+              </span>
+            </label>
+          </div>
+        </section>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Subtotal">
-          <input
-            value={subtotal}
-            onChange={(e) => setSubtotal(e.target.value)}
-            inputMode="decimal"
-            className="field-input"
-          />
-        </Field>
-        <Field label="Tax">
-          <input
-            value={tax}
-            onChange={(e) => setTax(e.target.value)}
-            inputMode="decimal"
-            className="field-input"
-          />
-        </Field>
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-sm safe-bottom">
+        <div className="mx-auto max-w-lg">
+          <button type="submit" disabled={loading} className="btn-accent">
+            {loading ? (
+              <>
+                <span className="spinner-sm" aria-hidden />
+                Saving to spreadsheet…
+              </>
+            ) : (
+              "Save to Google Sheets"
+            )}
+          </button>
+        </div>
       </div>
-
-      <Field label="Category">
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
-          className="field-input"
-        >
-          {EXPENSE_CATEGORIES.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-      </Field>
-
-      <Field label="Notes">
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={2}
-          className="field-input"
-          placeholder="Business purpose, client meeting, project, etc."
-        />
-      </Field>
-
-      <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3">
-        <input
-          type="checkbox"
-          checked={deductible}
-          onChange={(e) => setDeductible(e.target.checked)}
-          className="h-4 w-4 rounded border-slate-300"
-        />
-        <span className="text-sm text-slate-700">
-          Mark as tax-deductible business expense
-        </span>
-      </label>
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded-2xl bg-slate-900 px-6 py-4 text-base font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {loading ? "Saving to spreadsheet..." : "Save to Google Sheets"}
-      </button>
     </form>
+  );
+}
+
+function RetakeIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      className="h-5 w-5"
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z"
+      />
+    </svg>
   );
 }
 
@@ -339,7 +441,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block space-y-1">
+    <label className="block space-y-1.5">
       <span className="text-sm font-medium text-slate-700">{label}</span>
       {children}
     </label>

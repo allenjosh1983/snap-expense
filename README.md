@@ -6,7 +6,7 @@ Mobile-friendly receipt capture for LLC bookkeeping. Take a photo on your phone,
 
 1. Open the app on your phone (works in the browser; add to home screen for quick access).
 2. Snap or upload a receipt photo.
-3. Google Cloud Vision extracts merchant, date, total, tax, and subtotal.
+3. Google Cloud Vision (document text detection, English) extracts merchant, date, total, tax, and subtotal.
 4. You review and categorize the expense (with a tax-deductible flag).
 5. The app appends a row to your Google Sheet. Receipt images are optionally backed up to Google Drive when configured.
 
@@ -59,7 +59,7 @@ Existing spreadsheets that already have a **Raw OCR Text** column on Receipts ar
 
 Enable these APIs for the project:
 
-- Cloud Vision API
+- Cloud Vision API (document text detection for receipt OCR)
 - Google Sheets API
 - Google Drive API
 
@@ -175,7 +175,24 @@ This gives you a real HTTPS URL that Safari trusts, so the camera works.
 
 ## Deploying for daily use
 
-For real phone use outside your home network, deploy to [Vercel](https://vercel.com):
+### Hostinger VPS (stable domain, no tunnel)
+
+For a fixed HTTPS URL on your own server (recommended if you have a Hostinger VPS):
+
+1. Follow **[docs/DEPLOY-VPS.md](docs/DEPLOY-VPS.md)** — SSH, `.env`, credentials upload, PM2, nginx, and Let's Encrypt.
+2. Point your domain's A record at the VPS IP.
+3. Open your production URL on your phone and "Add to Home Screen".
+
+Quick start on the server after cloning:
+
+```bash
+chmod +x deploy/hostinger-setup.sh
+./deploy/hostinger-setup.sh
+```
+
+### Vercel
+
+For real phone use without managing a server, deploy to [Vercel](https://vercel.com):
 
 1. Push this repo to GitHub.
 2. Import the project in Vercel.
