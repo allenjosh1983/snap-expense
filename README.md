@@ -46,7 +46,50 @@ Existing spreadsheets that already have a **Raw OCR Text** column on Receipts ar
 
 - [Node.js 20+](https://nodejs.org/) (includes npm)
 - A Google Cloud project with billing enabled
-- A Google Sheet for your LLC expenses
+- A Google OAuth web client for sign-in (see [Google OAuth setup](#google-oauth-setup-multi-tenant))
+- A Google Sheet for your LLC expenses (each user connects their own after sign-in)
+
+## Google OAuth setup (multi-tenant)
+
+Each user signs in with Google and saves receipts to **their own** spreadsheet. Vision OCR still uses the service account (or ADC); Sheets and Drive use the signed-in user's OAuth token.
+
+### 1. OAuth consent screen
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **OAuth consent screen**.
+2. Choose **External** (or Internal if using Google Workspace).
+3. Add app name, support email, and your email as developer contact.
+4. Add scopes:
+   - `openid`, `email`, `profile`
+   - `https://www.googleapis.com/auth/spreadsheets`
+   - `https://www.googleapis.com/auth/drive.file`
+5. Add test users while the app is in **Testing** mode (each Google account that will sign in).
+
+### 2. OAuth web client
+
+1. **APIs & Services** → **Credentials** → **Create credentials** → **OAuth client ID**.
+2. Application type: **Web application**.
+3. Authorized redirect URIs:
+   - Production: `https://expenses.jallendevworks.cloud/api/auth/callback/google`
+   - Local dev: `http://localhost:3001/api/auth/callback/google`
+4. Copy **Client ID** and **Client secret** into `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+
+### 3. Auth environment variables
+
+```env
+AUTH_SECRET=your_random_secret   # openssl rand -base64 32
+AUTH_URL=https://expenses.jallendevworks.cloud
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+# DATABASE_PATH=./data/users.sqlite   # optional; default ./data/users.sqlite
+```
+
+Generate `AUTH_SECRET`:
+
+```bash
+openssl rand -base64 32
+```
+
+On first sign-in, users land on **Settings** to paste their Google Sheet URL. The app stores `email → spreadsheetId, tabName, driveFolderId` in SQLite.
 
 ## Google Cloud setup
 
@@ -63,9 +106,13 @@ Enable these APIs for the project:
 - Google Sheets API
 - Google Drive API
 
-### 3. Authentication (choose one)
+### 3. Authentication
 
-**Local development (recommended when org policy blocks JSON keys)**
+**Vision OCR (service account or ADC)**
+
+Vision document text detection uses `GOOGLE_APPLICATION_CREDENTIALS` (production) or Application Default Credentials (local dev). This is separate from user sign-in.
+
+**Local development (ADC when org policy blocks JSON keys)**
 
 If your organization blocks service account key creation (`iam.disableServiceAccountKeyCreation`), use Application Default Credentials with your personal Google account:
 
@@ -79,33 +126,30 @@ If your organization blocks service account key creation (`iam.disableServiceAcc
 
 The app uses ADC automatically when no valid key file is present. Your user account can read/write sheets you own — no service account share needed for local dev.
 
-**Production / Vercel deploy (service account)**
+**Production / VPS (service account for Vision only)**
 
 1. IAM & Admin → Service Accounts → Create service account.
 2. Create a JSON key and download it (requires org policy that allows key creation).
 3. Save it as `credentials/google-service-account.json` (gitignored).
 4. Set `GOOGLE_APPLICATION_CREDENTIALS=./credentials/google-service-account.json`.
-5. Share the spreadsheet (and optional Drive folder) with the service account email (Editor).
 
-### 4. Share your spreadsheet (service account deploy only)
+Sheets and Drive writes use each user's OAuth token after sign-in — you do **not** need to share spreadsheets with the service account for normal multi-tenant use.
 
-For **local ADC dev**, skip this — your logged-in user already has access to sheets you own.
+**Legacy single-tenant fallback**
 
-For **production** with a service account:
+If `GOOGLE_SHEETS_ID` is set and you are not using auth, the old service-account path still works via `appendReceiptToLegacySheet`. Prefer per-user settings for production.
 
-1. Create a Google Sheet (e.g. `LLC Expenses 2026`).
-2. Copy the spreadsheet ID from the URL:
-   `https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit`
-3. Share the sheet with your service account email (Editor access).
-   The email looks like `snap-expense@your-project.iam.gserviceaccount.com`.
+### 4. Per-user spreadsheet (after sign-in)
 
-### 4b. Optional: receipt image folder
+1. Sign in with Google at `/login`.
+2. On first visit, open **Settings** and paste your Google Sheet URL.
+3. Optionally set a Drive folder for receipt image backups.
 
-Receipt rows save to Google Sheets even without Drive. Image upload is skipped unless `GOOGLE_DRIVE_FOLDER_ID` is set.
+Each user's sheet must be owned by (or shared with) the Google account they used to sign in.
 
-**Service accounts have no personal Drive storage quota.** If you use a service account (production/Vercel), the folder must live in a **Shared Drive** and the service account needs Content manager access on that Shared Drive. Without that, uploads fail with a quota error — the app logs a warning and still saves the sheet row with an empty Image URL column.
+### 4b. Optional: receipt image folder (per user in Settings)
 
-**OAuth / ADC (local dev)** can use a regular My Drive folder you own.
+Receipt rows save to Google Sheets even without Drive. Image upload is skipped unless a Drive folder is configured in **Settings** (or legacy `GOOGLE_DRIVE_FOLDER_ID`).
 
 1. Create a folder (Shared Drive for service accounts, or My Drive for OAuth).
 2. Share it with your service account (Editor) or use your own account via ADC.
@@ -124,12 +168,18 @@ copy .env.example .env
 Edit `.env`:
 
 ```env
-# Local dev: leave GOOGLE_APPLICATION_CREDENTIALS unset; run gcloud auth application-default login
-# Production: GOOGLE_APPLICATION_CREDENTIALS=./credentials/google-service-account.json
-GOOGLE_SHEETS_ID=your_spreadsheet_id_here
-GOOGLE_SHEETS_TAB=Receipts
-# Optional: Shared Drive folder (service account) or My Drive folder (OAuth). Omit to skip images.
-GOOGLE_DRIVE_FOLDER_ID=
+AUTH_SECRET=...
+AUTH_URL=http://localhost:3001
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=
+
+# Vision OCR: leave GOOGLE_APPLICATION_CREDENTIALS unset; run gcloud auth application-default login
+# GOOGLE_APPLICATION_CREDENTIALS=./credentials/google-service-account.json
+
+# Legacy single-tenant only (optional):
+# GOOGLE_SHEETS_ID=your_spreadsheet_id_here
+# GOOGLE_SHEETS_TAB=Receipts
+# GOOGLE_DRIVE_FOLDER_ID=
 ```
 
 Run the dev server:
@@ -211,16 +261,29 @@ For real phone use without managing a server, deploy to [Vercel](https://vercel.
 
 ```
 src/
+  auth.ts                 # NextAuth (Google OAuth)
+  middleware.ts           # Protect routes
   app/
-    page.tsx              # Mobile capture flow
+    page.tsx              # Server redirect + home
+    HomePageClient.tsx    # Mobile capture flow
+    login/page.tsx        # Sign in with Google
+    settings/page.tsx     # Spreadsheet onboarding
+    api/auth/[...nextauth]/route.ts
+    api/settings/route.ts
     api/receipts/route.ts # Scan + save endpoints
   components/
+    AppHeader.tsx         # Email, Settings, Sign out
+    Providers.tsx         # SessionProvider
     CameraCapture.tsx
     ReceiptForm.tsx
   lib/
-    ocr.ts                # Google Vision
+    db.ts                 # SQLite user store
+    google-oauth.ts       # Refresh user access tokens
+    user-sheets.ts        # Per-user sheet writes
+    sheet-write.ts        # Shared append logic
+    ocr.ts                # Google Vision (service account)
     parse-receipt.ts      # Receipt field extraction
-    sheets.ts             # Google Sheets + Drive
+    sheets.ts             # Legacy export shim
 ```
 
 ## Next steps (optional)
@@ -228,4 +291,3 @@ src/
 - Auto-suggest category from merchant name
 - Monthly summary tab in the spreadsheet
 - QuickBooks / Xero export
-- Multi-user auth if you have employees submitting receipts

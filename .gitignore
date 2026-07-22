@@ -34,6 +34,9 @@ yarn-error.log*
 .env
 .env*.local
 
+# sqlite user database
+/data/
+
 # credentials (keep folder placeholder, ignore secrets)
 credentials/*
 !credentials/.gitkeep

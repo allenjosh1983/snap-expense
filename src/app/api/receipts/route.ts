@@ -1,10 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { extractReceiptFromImage } from "@/lib/ocr";
-import { appendReceiptToSheet } from "@/lib/sheets";
+import { appendReceiptToUserSheet } from "@/lib/user-sheets";
+import { getUserSheetConfig } from "@/lib/db";
 import { EXPENSE_CATEGORIES, type ReceiptSubmission } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    const email = session?.user?.email;
+
+    if (!email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const sheetConfig = getUserSheetConfig(email);
+    if (!sheetConfig) {
+      return NextResponse.json(
+        { error: "Spreadsheet not configured. Visit Settings first." },
+        { status: 403 },
+      );
+    }
+
     const body = await request.json();
     const action = body.action as "scan" | "submit";
 
@@ -58,17 +75,17 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const result = await appendReceiptToSheet(receipt);
-      const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
-      const tabName = process.env.GOOGLE_SHEETS_TAB || "Receipts";
-      const spreadsheetUrl = spreadsheetId
-        ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
-        : undefined;
+      const result = await appendReceiptToUserSheet(
+        email,
+        sheetConfig,
+        receipt,
+      );
+      const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${sheetConfig.spreadsheetId}/edit`;
 
       return NextResponse.json({
         ok: true,
-        message: `Receipt saved to the "${tabName}" tab`,
-        tabName,
+        message: `Receipt saved to the "${sheetConfig.tabName}" tab`,
+        tabName: sheetConfig.tabName,
         spreadsheetUrl,
         imageUrl: result.imageUrl,
       });
