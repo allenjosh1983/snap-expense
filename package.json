@@ -7,8 +7,9 @@
     "tunnel": "node scripts/tunnel.mjs",
     "dev:tunnel": "node scripts/tunnel.mjs",
     "build": "next build",
-    "start": "next start -H 0.0.0.0",
-    "start:prod": "next start -p ${PORT:-3000} -H 0.0.0.0",
+    "postbuild": "node scripts/prepare-standalone.mjs",
+    "start": "node .next/standalone/server.js",
+    "start:prod": "node scripts/prepare-standalone.mjs && node .next/standalone/server.js",
     "lint": "next lint"
   },
   "dependencies": {

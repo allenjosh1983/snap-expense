@@ -4,9 +4,8 @@ module.exports = {
     {
       name: "snap-expense",
       cwd: __dirname,
-      script: "npm",
-      args: "start",
-      interpreter: "none",
+      script: ".next/standalone/server.js",
+      interpreter: "node",
       instances: 1,
       exec_mode: "fork",
       autorestart: true,
@@ -16,6 +15,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: "3000",
+        HOSTNAME: "0.0.0.0",
       },
     },
   ],

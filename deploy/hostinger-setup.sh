@@ -62,10 +62,11 @@ if [[ ! -f .env ]]; then
   echo "    Upload credentials JSON to e.g. $APP_DIR/credentials/google-service-account.json"
 fi
 
-# --- Install deps and build ---
+# --- Install deps and build (postbuild copies public + static into standalone) ---
 echo "==> npm ci && npm run build"
 npm ci
 npm run build
+echo "    Standalone bundle ready at .next/standalone/ (started via node .next/standalone/server.js)"
 
 # --- PM2: start or restart ---
 if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
