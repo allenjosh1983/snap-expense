@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { hasSheetConfigured } from "@/lib/db";
+import { getUserByEmail, hasSheetConfigured } from "@/lib/db";
 import HomePageClient from "./HomePageClient";
 
 export default async function HomePage() {
@@ -15,5 +15,14 @@ export default async function HomePage() {
     redirect("/settings");
   }
 
-  return <HomePageClient />;
+  const user = getUserByEmail(email);
+  const configuredSpreadsheet =
+    user?.spreadsheetId != null
+      ? {
+          url: `https://docs.google.com/spreadsheets/d/${user.spreadsheetId}/edit`,
+          tabName: user.tabName || "Receipts",
+        }
+      : null;
+
+  return <HomePageClient configuredSpreadsheet={configuredSpreadsheet} />;
 }

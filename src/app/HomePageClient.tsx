@@ -1,32 +1,49 @@
 "use client";
 
-import { useState } from "react";
-import { CameraCapture } from "@/components/CameraCapture";
+import { useEffect, useRef, useState } from "react";
+import {
+  CameraCapture,
+  type CameraCaptureHandle,
+} from "@/components/CameraCapture";
 import { ReceiptForm } from "@/components/ReceiptForm";
 import { AppHeader } from "@/components/AppHeader";
 import type { ParsedReceipt, ReceiptSubmission } from "@/lib/types";
 
 type Step = "capture" | "review" | "done";
 
+type ConfiguredSpreadsheet = {
+  url: string;
+  tabName: string;
+};
+
+type HomePageClientProps = {
+  configuredSpreadsheet: ConfiguredSpreadsheet | null;
+};
+
 const HOW_IT_WORKS = [
   {
+    id: "snap" as const,
     step: "1",
     title: "Snap",
     description: "Photograph or upload a receipt",
   },
   {
+    id: "review" as const,
     step: "2",
     title: "Review",
     description: "Verify amounts and category",
   },
   {
+    id: "save" as const,
     step: "3",
     title: "Save",
     description: "Row added to your expense sheet",
   },
 ] as const;
 
-export default function HomePageClient() {
+export default function HomePageClient({
+  configuredSpreadsheet,
+}: HomePageClientProps) {
   const [step, setStep] = useState<Step>("capture");
   const [scanning, setScanning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -37,6 +54,77 @@ export default function HomePageClient() {
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
   const [savedTabName, setSavedTabName] = useState("Receipts");
   const [captureKey, setCaptureKey] = useState(0);
+  const [howItWorksHint, setHowItWorksHint] = useState<string | null>(null);
+  const [pendingCapture, setPendingCapture] = useState(false);
+
+  const cameraRef = useRef<CameraCaptureHandle>(null);
+  const captureSectionRef = useRef<HTMLElement>(null);
+
+  const canReview = parsed !== null;
+  const canSave = configuredSpreadsheet !== null;
+
+  useEffect(() => {
+    if (!pendingCapture || step !== "capture") return;
+
+    setPendingCapture(false);
+    requestAnimationFrame(() => {
+      captureSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      cameraRef.current?.triggerCapture();
+    });
+  }, [pendingCapture, step]);
+
+  function scrollToCaptureAndTrigger() {
+    captureSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+    cameraRef.current?.triggerCapture();
+  }
+
+  function handleSnapClick() {
+    setHowItWorksHint(null);
+
+    if (scanning) return;
+
+    if (step !== "capture") {
+      setStep("capture");
+      setPendingCapture(true);
+      return;
+    }
+
+    scrollToCaptureAndTrigger();
+  }
+
+  function handleReviewClick() {
+    setHowItWorksHint(null);
+
+    if (canReview) {
+      setStep("review");
+      return;
+    }
+
+    setHowItWorksHint("Capture a receipt first to review amounts and category.");
+  }
+
+  function handleSaveClick() {
+    setHowItWorksHint(null);
+
+    if (canSave && configuredSpreadsheet) {
+      window.open(configuredSpreadsheet.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    setHowItWorksHint("Connect a Google Sheet in Settings to save expenses.");
+  }
+
+  function handleHowItWorksClick(id: (typeof HOW_IT_WORKS)[number]["id"]) {
+    if (id === "snap") handleSnapClick();
+    else if (id === "review") handleReviewClick();
+    else handleSaveClick();
+  }
 
   async function handleCapture(
     _file: File,
@@ -44,6 +132,7 @@ export default function HomePageClient() {
     base64: string,
   ) {
     setError(null);
+    setHowItWorksHint(null);
     setScanning(true);
     setImageBase64(base64);
 
@@ -107,6 +196,8 @@ export default function HomePageClient() {
     setSuccessMessage("");
     setSpreadsheetUrl(null);
     setSavedTabName("Receipts");
+    setHowItWorksHint(null);
+    setPendingCapture(false);
     setCaptureKey((key) => key + 1);
   }
 
@@ -116,11 +207,22 @@ export default function HomePageClient() {
     setImageBase64("");
     setError(null);
     setScanning(false);
+    setHowItWorksHint(null);
     setCaptureKey((key) => key + 1);
   }
 
   function dismissError() {
     setError(null);
+  }
+
+  function isHowItWorksStepEnabled(id: (typeof HOW_IT_WORKS)[number]["id"]) {
+    if (id === "snap") return !scanning;
+    if (id === "review") return canReview;
+    return canSave;
+  }
+
+  function isHowItWorksStepDisabled(id: (typeof HOW_IT_WORKS)[number]["id"]) {
+    return id === "snap" && scanning;
   }
 
   return (
@@ -162,9 +264,10 @@ export default function HomePageClient() {
 
         {step === "capture" && (
           <>
-            <section className="space-y-4">
+            <section ref={captureSectionRef} className="space-y-4 scroll-mt-4">
               <CameraCapture
                 key={captureKey}
+                ref={cameraRef}
                 onCapture={handleCapture}
                 disabled={scanning}
               />
@@ -186,25 +289,80 @@ export default function HomePageClient() {
               )}
             </section>
 
+            {configuredSpreadsheet && (
+              <section
+                aria-label="Your spreadsheet"
+                className="rounded-lg border border-teal-200 bg-teal-50/50 p-4 shadow-sm"
+              >
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-teal-800">
+                  Your expense sheet
+                </h2>
+                <a
+                  href={configuredSpreadsheet.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 flex items-center gap-3 rounded-lg border border-teal-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-teal-300 hover:bg-teal-50/30 active:bg-teal-50"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-teal-800">
+                    <SheetIcon />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-900">
+                      {configuredSpreadsheet.tabName} tab
+                    </p>
+                    <p className="truncate text-xs text-slate-500">
+                      Open in Google Sheets
+                    </p>
+                  </div>
+                  <ExternalLinkIcon />
+                </a>
+              </section>
+            )}
+
             <section aria-label="How it works" className="space-y-3">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 How it works
               </h2>
+              {howItWorksHint && (
+                <p
+                  role="status"
+                  className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900"
+                >
+                  {howItWorksHint}
+                </p>
+              )}
               <ol className="grid grid-cols-3 gap-2">
-                {HOW_IT_WORKS.map((item) => (
-                  <li
-                    key={item.step}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-center shadow-sm"
-                  >
-                    <span className="step-badge mx-auto">{item.step}</span>
-                    <p className="mt-2 text-xs font-semibold text-slate-900">
-                      {item.title}
-                    </p>
-                    <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
-                      {item.description}
-                    </p>
-                  </li>
-                ))}
+                {HOW_IT_WORKS.map((item) => {
+                  const enabled = isHowItWorksStepEnabled(item.id);
+                  const disabled = isHowItWorksStepDisabled(item.id);
+
+                  return (
+                    <li key={item.step}>
+                      <button
+                        type="button"
+                        onClick={() => handleHowItWorksClick(item.id)}
+                        disabled={disabled}
+                        aria-label={`${item.title}: ${item.description}`}
+                        aria-disabled={!enabled}
+                        className={`w-full rounded-lg border px-3 py-3 text-center shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${
+                          disabled
+                            ? "cursor-not-allowed border-slate-100 bg-slate-50 opacity-70"
+                            : enabled
+                              ? "cursor-pointer border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50/40 active:bg-teal-50"
+                              : "cursor-pointer border-slate-100 bg-slate-50/80 hover:border-amber-200 hover:bg-amber-50/50 active:bg-amber-50/70"
+                        }`}
+                      >
+                        <span className="step-badge mx-auto">{item.step}</span>
+                        <p className="mt-2 text-xs font-semibold text-slate-900">
+                          {item.title}
+                        </p>
+                        <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
+                          {item.description}
+                        </p>
+                      </button>
+                    </li>
+                  );
+                })}
               </ol>
             </section>
           </>
@@ -358,6 +516,26 @@ function SheetIcon() {
     >
       <rect x="3" y="3" width="18" height="18" rx="2" />
       <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      className="h-4 w-4 shrink-0 text-slate-400"
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M13.5 6H18v4.5M10.5 13.5 18 6m-3-7.5h3.75A2.25 2.25 0 0 1 21 3.75v3.75M6 18H3.75A2.25 2.25 0 0 1 1.5 15.75v-9A2.25 2.25 0 0 1 3.75 4.5H9"
+      />
     </svg>
   );
 }
