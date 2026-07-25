@@ -1,15 +1,13 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface CameraCaptureProps {
   onCapture: (file: File, previewUrl: string, base64: string) => void;
   disabled?: boolean;
+  /** Increment to programmatically open the camera/file picker. */
+  captureTrigger?: number;
 }
-
-export type CameraCaptureHandle = {
-  triggerCapture: () => void;
-};
 
 async function fileToBase64(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
@@ -21,21 +19,24 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(binary);
 }
 
-export const CameraCapture = forwardRef<
-  CameraCaptureHandle,
-  CameraCaptureProps
->(function CameraCapture({ onCapture, disabled }, ref) {
+export function CameraCapture({
+  onCapture,
+  disabled,
+  captureTrigger = 0,
+}: CameraCaptureProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const lastTriggerRef = useRef(captureTrigger);
 
-  useImperativeHandle(ref, () => ({
-    triggerCapture: () => {
-      if (!disabled && !loading) {
-        inputRef.current?.click();
-      }
-    },
-  }));
+  useEffect(() => {
+    if (captureTrigger === lastTriggerRef.current) return;
+    lastTriggerRef.current = captureTrigger;
+
+    if (!disabled && !loading) {
+      inputRef.current?.click();
+    }
+  }, [captureTrigger, disabled, loading]);
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -100,7 +101,7 @@ export const CameraCapture = forwardRef<
       )}
     </div>
   );
-});
+}
 
 function CameraIcon() {
   return (

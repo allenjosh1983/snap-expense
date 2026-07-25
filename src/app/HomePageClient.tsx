@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  CameraCapture,
-  type CameraCaptureHandle,
-} from "@/components/CameraCapture";
+import { CameraCapture } from "@/components/CameraCapture";
 import { ReceiptForm } from "@/components/ReceiptForm";
 import { AppHeader } from "@/components/AppHeader";
 import type { ParsedReceipt, ReceiptSubmission } from "@/lib/types";
@@ -17,7 +14,7 @@ type ConfiguredSpreadsheet = {
 };
 
 type HomePageClientProps = {
-  configuredSpreadsheet: ConfiguredSpreadsheet | null;
+  configuredSpreadsheet?: ConfiguredSpreadsheet | null;
 };
 
 const HOW_IT_WORKS = [
@@ -42,7 +39,7 @@ const HOW_IT_WORKS = [
 ] as const;
 
 export default function HomePageClient({
-  configuredSpreadsheet,
+  configuredSpreadsheet = null,
 }: HomePageClientProps) {
   const [step, setStep] = useState<Step>("capture");
   const [scanning, setScanning] = useState(false);
@@ -54,10 +51,10 @@ export default function HomePageClient({
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string | null>(null);
   const [savedTabName, setSavedTabName] = useState("Receipts");
   const [captureKey, setCaptureKey] = useState(0);
+  const [captureTrigger, setCaptureTrigger] = useState(0);
   const [howItWorksHint, setHowItWorksHint] = useState<string | null>(null);
   const [pendingCapture, setPendingCapture] = useState(false);
 
-  const cameraRef = useRef<CameraCaptureHandle>(null);
   const captureSectionRef = useRef<HTMLElement>(null);
 
   const canReview = parsed !== null;
@@ -72,7 +69,7 @@ export default function HomePageClient({
         behavior: "smooth",
         block: "start",
       });
-      cameraRef.current?.triggerCapture();
+      setCaptureTrigger((value) => value + 1);
     });
   }, [pendingCapture, step]);
 
@@ -81,7 +78,7 @@ export default function HomePageClient({
       behavior: "smooth",
       block: "start",
     });
-    cameraRef.current?.triggerCapture();
+    setCaptureTrigger((value) => value + 1);
   }
 
   function handleSnapClick() {
@@ -267,7 +264,7 @@ export default function HomePageClient({
             <section ref={captureSectionRef} className="space-y-4 scroll-mt-4">
               <CameraCapture
                 key={captureKey}
-                ref={cameraRef}
+                captureTrigger={captureTrigger}
                 onCapture={handleCapture}
                 disabled={scanning}
               />
