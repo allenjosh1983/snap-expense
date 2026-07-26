@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { CameraCapture } from "@/components/CameraCapture";
 import { ReceiptForm } from "@/components/ReceiptForm";
@@ -114,7 +115,9 @@ export default function HomePageClient({
       return;
     }
 
-    setHowItWorksHint("Connect a Google Sheet in Settings to save expenses.");
+    setHowItWorksHint(
+      "Connect your Google Sheet in Settings before saving receipts.",
+    );
   }
 
   function handleHowItWorksClick(id: (typeof HOW_IT_WORKS)[number]["id"]) {
@@ -261,32 +264,7 @@ export default function HomePageClient({
 
         {step === "capture" && (
           <>
-            <section ref={captureSectionRef} className="space-y-4 scroll-mt-4">
-              <CameraCapture
-                key={captureKey}
-                captureTrigger={captureTrigger}
-                onCapture={handleCapture}
-                disabled={scanning}
-              />
-              {scanning && (
-                <div className="loading-panel">
-                  <span className="spinner" aria-hidden />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-slate-900">
-                      Reading receipt…
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      Extracting merchant, date, and amounts
-                    </p>
-                  </div>
-                  <div className="mt-1 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full w-2/3 animate-pulse rounded-full bg-teal-600/40" />
-                  </div>
-                </div>
-              )}
-            </section>
-
-            {configuredSpreadsheet && (
+            {configuredSpreadsheet ? (
               <section
                 aria-label="Your spreadsheet"
                 className="rounded-lg border border-teal-200 bg-teal-50/50 p-4 shadow-sm"
@@ -314,7 +292,44 @@ export default function HomePageClient({
                   <ExternalLinkIcon />
                 </a>
               </section>
+            ) : (
+              <section
+                aria-label="Connect spreadsheet"
+                className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 shadow-sm"
+              >
+                <p className="text-sm text-amber-950">
+                  Connect your Google Sheet before saving receipts.
+                </p>
+                <Link href="/settings" className="btn-secondary mt-3">
+                  Connect spreadsheet
+                </Link>
+              </section>
             )}
+
+            <section ref={captureSectionRef} className="space-y-4 scroll-mt-4">
+              <CameraCapture
+                key={captureKey}
+                captureTrigger={captureTrigger}
+                onCapture={handleCapture}
+                disabled={scanning}
+              />
+              {scanning && (
+                <div className="loading-panel">
+                  <span className="spinner" aria-hidden />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-slate-900">
+                      Reading receipt…
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Extracting merchant, date, and amounts
+                    </p>
+                  </div>
+                  <div className="mt-1 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full w-2/3 animate-pulse rounded-full bg-teal-600/40" />
+                  </div>
+                </div>
+              )}
+            </section>
 
             <section aria-label="How it works" className="space-y-3">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">

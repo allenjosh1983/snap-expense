@@ -15,12 +15,6 @@ export async function POST(request: NextRequest) {
     }
 
     const sheetConfig = getUserSheetConfig(email);
-    if (!sheetConfig) {
-      return NextResponse.json(
-        { error: "Spreadsheet not configured. Visit Settings first." },
-        { status: 403 },
-      );
-    }
 
     const body = await request.json();
     const action = body.action as "scan" | "submit";
@@ -36,6 +30,13 @@ export async function POST(request: NextRequest) {
 
       const parsed = await extractReceiptFromImage(imageBase64);
       return NextResponse.json({ parsed });
+    }
+
+    if (!sheetConfig) {
+      return NextResponse.json(
+        { error: "Spreadsheet not configured. Visit Settings first." },
+        { status: 403 },
+      );
     }
 
     if (action === "submit") {

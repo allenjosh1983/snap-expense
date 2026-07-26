@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { getUserSheetConfig, hasSheetConfigured } from "@/lib/db";
+import { getUserSheetConfig } from "@/lib/db";
 import HomePageClient from "./HomePageClient";
 
 export default async function HomePage() {
@@ -9,10 +9,6 @@ export default async function HomePage() {
 
   if (!email) {
     redirect("/login");
-  }
-
-  if (!hasSheetConfigured(email)) {
-    redirect("/settings");
   }
 
   const sheetConfig = getUserSheetConfig(email);

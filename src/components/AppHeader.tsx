@@ -33,10 +33,12 @@ export function AppHeader({ onHomeClick }: AppHeaderProps) {
           </Link>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-slate-900">Snap Expense</p>
-          <p className="truncate text-xs text-slate-500">
-            {email ?? "Expense tracking on the go"}
-          </p>
+          <Link href="/" className="block hover:opacity-90">
+            <p className="text-sm font-semibold text-slate-900">Snap Expense</p>
+            <p className="truncate text-xs text-slate-500">
+              {email ?? "Expense tracking on the go"}
+            </p>
+          </Link>
         </div>
         <nav className="flex shrink-0 items-center gap-2">
           <Link
