@@ -8,7 +8,11 @@ export default auth((req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = Boolean(req.auth?.user?.email);
 
-  if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/help") ||
+    pathname.startsWith("/api/auth")
+  ) {
     if (isLoggedIn && pathname === "/login") {
       return NextResponse.redirect(new URL("/", req.url));
     }
@@ -28,5 +32,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/", "/settings", "/api/receipts", "/login"],
+  matcher: ["/", "/settings", "/api/receipts", "/login", "/help"],
 };

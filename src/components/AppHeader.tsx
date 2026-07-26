@@ -40,6 +40,12 @@ export function AppHeader({ onHomeClick }: AppHeaderProps) {
         </div>
         <nav className="flex shrink-0 items-center gap-2">
           <Link
+            href="/help"
+            className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+          >
+            Help
+          </Link>
+          <Link
             href="/settings"
             className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
           >

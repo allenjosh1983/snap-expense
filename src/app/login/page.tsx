@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -140,6 +141,15 @@ function LoginForm() {
             ))}
           </ol>
         </section>
+
+        <p className="text-center">
+          <Link
+            href="/help"
+            className="text-xs font-medium text-teal-800 underline-offset-2 hover:underline"
+          >
+            Help &amp; FAQ
+          </Link>
+        </p>
       </div>
     </div>
   );
